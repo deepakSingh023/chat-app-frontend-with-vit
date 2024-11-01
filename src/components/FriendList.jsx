@@ -5,13 +5,16 @@ import axios from 'axios';
 const FriendList = () => {
     const { user } = useAuth();
     const [friends, setFriends] = useState([]);
-
+    
     useEffect(() => {
+        const token = localStorage.getItem('token'); 
         const fetchFriends = async () => {
+            console.log(token)
             if (user) {
                 try {
+                    
                     const response = await axios.get('http://localhost:5000/api/auth/friends', {
-                        headers: { Authorization: `Bearer ${user.token}` } // Ensure token is included
+                        headers: { Authorization: `Bearer ${token}` } // Ensure token is included
                     });
                     setFriends(response.data);
                 } catch (error) {
@@ -24,12 +27,13 @@ const FriendList = () => {
     }, [user]);
 
     const removeFriend = async (friendId) => {
+        const token = localStorage.getItem('token');
         try {
             await axios.post(
                 'http://localhost:5000/api/auth/remove-friend', // Endpoint for removing a friend
                 { friendId }, // Send the friend's ID in the body
                 {
-                    headers: { Authorization: `Bearer ${user.token}` } // Include authorization token
+                    headers: { Authorization: `Bearer ${token}` } // Include authorization token
                 }
             );
 

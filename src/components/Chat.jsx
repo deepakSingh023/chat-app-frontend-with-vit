@@ -36,8 +36,11 @@ const Chat = () => {
 
         fetchMessages();
 
+        // Listen for new messages from the socket, only for the receiver
         socket.on('receiveMessage', (newMessage) => {
-            setMessages((prevMessages) => [...prevMessages, newMessage]);
+            if (newMessage.sender !== user.id) { // Ensure the message is from the other user
+                setMessages((prevMessages) => [...prevMessages, newMessage]);
+            }
         });
 
         return () => {
@@ -50,33 +53,34 @@ const Chat = () => {
             console.error('User or friendId not found');
             return;
         }
-    
+
         const messageData = {
             senderId: user.id,   // Ensure user.id is correct
             receiverId: friendId,
             content: message,
         };
-    
+
         try {
             // Send the message data to the backend
-            await axios.post('http://localhost:5000/api/messages', messageData, {
+            const response = await axios.post('http://localhost:5000/api/messages', messageData, {
                 headers: {
                     Authorization: `Bearer ${user.token}`,
                 },
             });
-    
-            // Emit the message via socket.io
-            socket.emit('sendMessage', messageData);
-    
+
+            // Immediately add the message to the sender's view
+            setMessages((prevMessages) => [...prevMessages, { ...messageData, sender: user }]);
+
+            // Emit the message via socket.io to notify the receiver in real time
+            socket.emit('sendMessage', response.data);
+
             // Clear the input field after sending
             setMessage('');
         } catch (error) {
             console.error('Error sending message:', error);
         }
     };
-    
 
-    // Add a loading state or conditional rendering based on user and friendId
     if (!user || !friendId) {
         return <div>Loading or invalid chat...</div>; // Prevent errors when user or friendId is not available
     }
