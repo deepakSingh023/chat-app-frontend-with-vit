@@ -33,9 +33,7 @@ export const AuthProvider = ({ children }) => {
             if (userData) {
                 setUser({ ...userData, token });
                 localStorage.setItem('token', token);
-                localStorage.setItem('userID', userData.id)
             }
-            console.log(localStorage.getItem('token'))
 
         } catch (error) {
             // Handle any errors during the login process
