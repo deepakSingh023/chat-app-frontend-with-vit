@@ -109,7 +109,7 @@
 // export default Chat;
 
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+//import { useEffect, useState, useRef, useCallback } from 'react';
 import io from 'socket.io-client';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -117,15 +117,15 @@ import axios from 'axios';
 import { format, isToday, isYesterday } from 'date-fns';
 
 // Create socket instance outside component
-const socket = io('https://chat-app-backend-ybof.onrender.com', {
+//const socket = io('https://chat-app-backend-ybof.onrender.com', {
   autoConnect: false,
   transports: ['websocket'],
   reconnection: true,
   reconnectionAttempts: 5,
   reconnectionDelay: 1000,
-});
+//});
 
-const Chat = () => {
+/*const Chat = () => {
     const { friendId } = useParams();
     const { user } = useAuth();
     const [messages, setMessages] = useState([]);
@@ -299,7 +299,7 @@ const Chat = () => {
 
     return (
         <div className="flex flex-col h-screen max-w-3xl mx-auto bg-white shadow-lg">
-            {/* Chat header */}
+            
             <div className="bg-indigo-600 text-white p-4 flex items-center">
                 <div className="bg-gray-200 border-2 border-dashed rounded-xl w-10 h-10" />
                 <div className="ml-3">
@@ -310,7 +310,7 @@ const Chat = () => {
                 </div>
             </div>
 
-            {/* Messages container */}
+            
             <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
                 {messages.map((msg) => (
                     <div 
@@ -331,7 +331,7 @@ const Chat = () => {
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Message input */}
+            
             <div className="p-4 bg-white border-t border-gray-200">
                 <form onSubmit={sendMessage} className="flex items-center">
                     <input
@@ -355,6 +355,225 @@ const Chat = () => {
             </div>
         </div>
     );
+};*/
+
+//export default Chat;
+
+import { useEffect, useState, useRef, useCallback } from 'react';
+import io from 'socket.io-client';
+import { useParams } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
+import { format, isToday, isYesterday } from 'date-fns';
+
+// Create socket instance globally
+const socket = io('https://chat-app-backend-ybof.onrender.com', {
+  autoConnect: false,
+  transports: ['websocket'],
+});
+
+const Chat = () => {
+  const { friendId } = useParams();
+  const { user } = useAuth();
+  const [messages, setMessages] = useState([]);
+  const [message, setMessage] = useState('');
+  const [friendUsername, setFriendUsername] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const messagesEndRef = useRef(null);
+  const socketInitialized = useRef(false);
+  const tempIdRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
+
+  // Fetch friend's username
+  useEffect(() => {
+    const fetchFriendUsername = async () => {
+      if (!friendId || !user?.token) return;
+      try {
+        const res = await axios.get(`https://chat-app-backend-ybof.onrender.com/api/users/${friendId}`, {
+          headers: { Authorization: `Bearer ${user.token}` },
+        });
+        setFriendUsername(res.data.username);
+      } catch (err) {
+        console.error('Username fetch error:', err);
+      }
+    };
+    fetchFriendUsername();
+  }, [friendId, user]);
+
+  const formatTimestamp = useCallback((timestamp) => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    if (isToday(date)) return format(date, 'HH:mm');
+    else if (isYesterday(date)) return 'Yesterday ' + format(date, 'HH:mm');
+    return format(date, 'dd/MM/yyyy HH:mm');
+  }, []);
+
+  // Socket setup and message fetching
+  useEffect(() => {
+    if (!user || !friendId) return;
+
+    const fetchMessages = async () => {
+      try {
+        const res = await axios.get(
+          `https://chat-app-backend-ybof.onrender.com/api/messages/${user.id}/${friendId}`,
+          { headers: { Authorization: `Bearer ${user.token}` } }
+        );
+        setMessages(res.data);
+      } catch (err) {
+        console.error('Fetch messages error:', err);
+      }
+    };
+
+    fetchMessages();
+
+    // Connect socket
+    if (!socketInitialized.current) {
+      socket.auth = { token: user.token };
+      socket.connect();
+
+      socket.on('connect', () => {
+        console.log('🟢 Connected to socket:', socket.id);
+        socket.emit('registerUser', user.id); // REQUIRED!
+      });
+
+      socket.on('receiveMessage', (newMsg) => {
+        const isRelevant =
+          (newMsg.sender === user.id && newMsg.receiver === friendId) ||
+          (newMsg.sender === friendId && newMsg.receiver === user.id);
+        if (isRelevant) {
+          setMessages((prev) => {
+            if (tempIdRef.current) {
+              return prev.map((m) => (m._id === tempIdRef.current ? newMsg : m));
+            }
+            return prev.some((m) => m._id === newMsg._id) ? prev : [...prev, newMsg];
+          });
+          tempIdRef.current = null;
+        }
+      });
+
+      socket.on('typing', (senderId) => {
+        if (senderId === friendId) {
+          setIsTyping(true);
+          clearTimeout(typingTimeoutRef.current);
+          typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 2000);
+        }
+      });
+
+      socket.on('connect_error', (err) => {
+        console.error('Socket connection error:', err.message);
+      });
+
+      socketInitialized.current = true;
+    }
+
+    return () => {
+      socket.off('receiveMessage');
+      socket.off('typing');
+      clearTimeout(typingTimeoutRef.current);
+    };
+  }, [user, friendId]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleInputChange = (e) => {
+    setMessage(e.target.value);
+    if (e.target.value.trim() && socketInitialized.current) {
+      socket.emit('typing', { senderId: user.id, receiverId: friendId });
+    }
+  };
+
+  const sendMessage = (e) => {
+    e.preventDefault();
+    const trimmed = message.trim();
+    if (!trimmed || !user || !friendId) return;
+
+    const messageData = {
+      senderId: user.id,
+      receiverId: friendId,
+      content: trimmed,
+    };
+
+    // Optimistic update
+    tempIdRef.current = `temp-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      {
+        ...messageData,
+        _id: tempIdRef.current,
+        timestamp: new Date().toISOString(),
+        sender: { username: user.username || 'You' },
+        isOptimistic: true,
+      },
+    ]);
+    setMessage('');
+
+    socket.emit('sendMessage', messageData);
+  };
+
+  if (!user || !friendId) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <p>Loading chat...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-screen max-w-3xl mx-auto bg-white shadow">
+      {/* Header */}
+      <div className="p-4 bg-indigo-600 text-white flex items-center">
+        <div className="w-10 h-10 bg-gray-200 rounded-full" />
+        <div className="ml-3">
+          <div className="font-semibold">{friendUsername}</div>
+          <div className="text-xs">{isTyping ? 'typing...' : 'Online'}</div>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 p-4 overflow-y-auto bg-gray-50">
+        {messages.map((msg) => (
+          <div
+            key={msg._id}
+            className={`flex mb-4 ${msg.sender === user.id ? 'justify-end' : 'justify-start'}`}
+          >
+            <div
+              className={`max-w-xs px-4 py-2 rounded-2xl ${
+                msg.sender === user.id
+                  ? 'bg-indigo-600 text-white rounded-br-none'
+                  : 'bg-white text-gray-800 rounded-bl-none border'
+              }`}
+            >
+              <div>{msg.content}</div>
+              <div className="text-xs mt-1 text-right opacity-60">
+                {formatTimestamp(msg.timestamp)}
+              </div>
+            </div>
+          </div>
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input */}
+      <form onSubmit={sendMessage} className="p-4 bg-white border-t flex items-center">
+        <input
+          type="text"
+          value={message}
+          onChange={handleInputChange}
+          placeholder="Type a message..."
+          className="flex-1 px-4 py-3 bg-gray-100 rounded-full outline-none"
+        />
+        <button
+          type="submit"
+          className="ml-3 bg-indigo-600 text-white p-3 rounded-full disabled:opacity-50"
+          disabled={!message.trim()}
+        >
+          ➤
+        </button>
+      </form>
+    </div>
+  );
 };
 
 export default Chat;
