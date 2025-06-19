@@ -177,6 +177,7 @@ const Chat = () => {
         fetchMessages();
 
         const handleReceiveMessage = (newMessage) => {
+            console.log('Received socket message:', newMessage);
             const isRelevant = 
                 (newMessage.senderId === user.id && newMessage.receiverId === friendId) ||
                 (newMessage.senderId === friendId && newMessage.receiverId === user.id);
@@ -206,9 +207,20 @@ const Chat = () => {
         };
 
         socket.on('receiveMessage', handleReceiveMessage);
+        
+        // Add listener for new messages sent by the current user
+        socket.on('messageSent', (sentMessage) => {
+            console.log('Message sent confirmation:', sentMessage);
+            if (sentMessage.senderId === user.id && sentMessage.receiverId === friendId) {
+                setMessages(prev => prev.map(msg => 
+                    msg.isOptimistic && msg.content === sentMessage.content ? sentMessage : msg
+                ));
+            }
+        });
 
         return () => {
             socket.off('receiveMessage', handleReceiveMessage);
+            socket.off('messageSent');
         };
     }, [fetchMessages, friendId, user]);
 
@@ -240,6 +252,13 @@ const Chat = () => {
             setMessage('');
             setMessages(prev => [...prev, optimisticMessage]);
 
+            // Emit the message via socket first for immediate delivery
+            socket.emit('sendMessage', {
+                ...messageData,
+                sender: { username: user.username || 'You' }
+            });
+            
+            // Then send to backend for persistence
             await axios.post(
                 'https://chat-app-backend-ybof.onrender.com/api/messages',
                 messageData,
