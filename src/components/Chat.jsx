@@ -126,14 +126,12 @@ const Chat = () => {
     const [message, setMessage] = useState('');
     const messagesEndRef = useRef(null);
     const socketInitialized = useRef(false);
-    const userRef = useRef(user); // Ref to track current user
+    const userRef = useRef(user);
 
-    // Update ref when user changes
     useEffect(() => {
         userRef.current = user;
     }, [user]);
 
-    // Fetch messages when user or friendId changes
     const fetchMessages = useCallback(async () => {
         if (!userRef.current?.id || !friendId) return;
         
@@ -159,25 +157,27 @@ const Chat = () => {
         fetchMessages();
 
         const handleReceiveMessage = (newMessage) => {
-            setMessages(prev => {
-                // Check if message already exists
-                if (prev.some(msg => msg._id === newMessage._id)) return prev;
-                
-                // Check if it's an optimistic message we need to replace
-                const existingIndex = prev.findIndex(
-                    msg => msg.isOptimistic && 
-                    msg.content === newMessage.content &&
-                    msg.senderId === newMessage.senderId
-                );
+            // Only add messages where current user is the receiver
+            if (newMessage.receiverId === userRef.current.id) {
+                setMessages(prev => {
+                    if (prev.some(msg => msg._id === newMessage._id)) return prev;
+                    
+                    // Replace optimistic message if exists
+                    const existingIndex = prev.findIndex(
+                        msg => msg.isOptimistic && 
+                        msg.content === newMessage.content &&
+                        msg.senderId === newMessage.senderId
+                    );
 
-                if (existingIndex !== -1) {
-                    const newMessages = [...prev];
-                    newMessages[existingIndex] = newMessage;
-                    return newMessages;
-                }
-                
-                return [...prev, newMessage];
-            });
+                    if (existingIndex !== -1) {
+                        const newMessages = [...prev];
+                        newMessages[existingIndex] = newMessage;
+                        return newMessages;
+                    }
+                    
+                    return [...prev, newMessage];
+                });
+            }
         };
 
         socket.on('receiveMessage', handleReceiveMessage);
