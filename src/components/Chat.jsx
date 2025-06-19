@@ -118,11 +118,11 @@ import { format, isToday, isYesterday } from 'date-fns';
 
 // Create socket instance outside component
 //const socket = io('https://chat-app-backend-ybof.onrender.com', {
-  autoConnect: false,
-  transports: ['websocket'],
-  reconnection: true,
-  reconnectionAttempts: 5,
-  reconnectionDelay: 1000,
+  //autoConnect: false,
+  //transports: ['websocket'],
+  //reconnection: true,
+  //reconnectionAttempts: 5,
+  //reconnectionDelay: 1000,
 //});
 
 /*const Chat = () => {
