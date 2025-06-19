@@ -157,8 +157,12 @@ const Chat = () => {
         fetchMessages();
 
         const handleReceiveMessage = (newMessage) => {
-            // Only add messages where current user is the receiver
-            if (newMessage.receiverId === userRef.current.id) {
+            // Check if message is relevant to current chat
+            const isRelevant = 
+                (newMessage.senderId === userRef.current.id && newMessage.receiverId === friendId) ||
+                (newMessage.senderId === friendId && newMessage.receiverId === userRef.current.id);
+            
+            if (isRelevant) {
                 setMessages(prev => {
                     if (prev.some(msg => msg._id === newMessage._id)) return prev;
                     
