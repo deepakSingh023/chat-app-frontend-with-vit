@@ -114,7 +114,6 @@ import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 
-// Create socket instance outside component to prevent reconnections
 const socket = io('https://chat-app-backend-ybof.onrender.com', {
   autoConnect: false,
   transports: ['websocket'],
@@ -127,26 +126,31 @@ const Chat = () => {
     const [message, setMessage] = useState('');
     const messagesEndRef = useRef(null);
     const socketInitialized = useRef(false);
+    const userRef = useRef(user); // Ref to track current user
+
+    // Update ref when user changes
+    useEffect(() => {
+        userRef.current = user;
+    }, [user]);
 
     // Fetch messages when user or friendId changes
     const fetchMessages = useCallback(async () => {
-        if (!user?.id || !friendId) return;
+        if (!userRef.current?.id || !friendId) return;
         
         try {
             const response = await axios.get(
-                `https://chat-app-backend-ybof.onrender.com/api/messages/${user.id}/${friendId}`,
-                { headers: { Authorization: `Bearer ${user.token}` } }
+                `https://chat-app-backend-ybof.onrender.com/api/messages/${userRef.current.id}/${friendId}`,
+                { headers: { Authorization: `Bearer ${userRef.current.token}` } }
             );
             setMessages(response.data);
         } catch (error) {
             console.error('Error fetching messages:', error);
         }
-    }, [user, friendId]);
+    }, [friendId]);
 
     useEffect(() => {
-        if (!user?.id || !friendId) return;
+        if (!userRef.current?.id || !friendId) return;
 
-        // Initialize socket connection once
         if (!socketInitialized.current) {
             socket.connect();
             socketInitialized.current = true;
@@ -154,11 +158,24 @@ const Chat = () => {
 
         fetchMessages();
 
-        // Setup socket listener
         const handleReceiveMessage = (newMessage) => {
             setMessages(prev => {
-                // Prevent duplicates by checking message ID
+                // Check if message already exists
                 if (prev.some(msg => msg._id === newMessage._id)) return prev;
+                
+                // Check if it's an optimistic message we need to replace
+                const existingIndex = prev.findIndex(
+                    msg => msg.isOptimistic && 
+                    msg.content === newMessage.content &&
+                    msg.senderId === newMessage.senderId
+                );
+
+                if (existingIndex !== -1) {
+                    const newMessages = [...prev];
+                    newMessages[existingIndex] = newMessage;
+                    return newMessages;
+                }
+                
                 return [...prev, newMessage];
             });
         };
@@ -167,54 +184,48 @@ const Chat = () => {
 
         return () => {
             socket.off('receiveMessage', handleReceiveMessage);
-            // Don't disconnect socket - keep connection alive
         };
-    }, [fetchMessages, user?.id, friendId]);
+    }, [fetchMessages, friendId]);
 
-    // Auto-scroll to bottom when messages change
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
     const sendMessage = async (e) => {
-        e?.preventDefault(); // Handle form submission
-        
-        if (!message.trim() || !user?.id || !friendId) return;
+        e?.preventDefault();
+        if (!message.trim() || !userRef.current?.id || !friendId) return;
 
         const messageData = {
-            senderId: user.id,
+            senderId: userRef.current.id,
             receiverId: friendId,
             content: message.trim(),
         };
 
         try {
-            // Clear input immediately for better UX
             setMessage('');
             
-            // Optimistically add message to UI
-            setMessages(prev => [
-                ...prev, 
-                {
-                    ...messageData,
-                    _id: Date.now().toString(), // Temporary ID
-                    timestamp: new Date().toISOString(),
-                    sender: { username: user.username || 'You' }
-                }
-            ]);
+            // Create temporary message with optimistic flag
+            const tempId = `temp-${Date.now()}`;
+            const optimisticMessage = {
+                ...messageData,
+                _id: tempId,
+                timestamp: new Date().toISOString(),
+                sender: { username: userRef.current.username || 'You' },
+                isOptimistic: true
+            };
 
-            // Send to backend
+            setMessages(prev => [...prev, optimisticMessage]);
+
             await axios.post(
                 'https://chat-app-backend-ybof.onrender.com/api/messages',
                 messageData,
-                { headers: { Authorization: `Bearer ${user.token}` } }
+                { headers: { Authorization: `Bearer ${userRef.current.token}` } }
             );
             
-            // Server will broadcast via socket.io
         } catch (error) {
             console.error('Error sending message:', error);
-            // Revert optimistic update on error
-            setMessages(prev => prev.filter(msg => msg._id !== Date.now().toString()));
-            setMessage(messageData.content); // Restore message
+            setMessages(prev => prev.filter(msg => msg._id !== tempId));
+            setMessage(messageData.content);
         }
     };
 
@@ -241,14 +252,19 @@ const Chat = () => {
                                     isCurrentUser 
                                         ? 'bg-indigo-500 text-white rounded-br-none' 
                                         : 'bg-gray-200 text-gray-800 rounded-bl-none'
+                                } ${
+                                    msg.isOptimistic ? 'opacity-70' : ''
                                 }`}
                             >
                                 <div className="font-semibold">
-                                    {isCurrentUser ? 'You' : msg.sender?.username}
+                                    {isCurrentUser ? 'You' : msg.sender?.username || 'Unknown'}
                                 </div>
                                 <div className="mt-1">{msg.content}</div>
                                 <div className={`text-xs mt-1 ${isCurrentUser ? 'text-indigo-200' : 'text-gray-500'}`}>
-                                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { 
+                                        hour: '2-digit', 
+                                        minute: '2-digit' 
+                                    }) : 'Sending...'}
                                 </div>
                             </div>
                         </div>
@@ -265,6 +281,7 @@ const Chat = () => {
                         onChange={(e) => setMessage(e.target.value)}
                         placeholder="Type a message..."
                         className="flex-1 border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        onKeyDown={(e) => e.key === 'Enter' && sendMessage(e)}
                     />
                     <button
                         type="submit"
