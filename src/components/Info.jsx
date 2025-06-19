@@ -1,72 +1,87 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import axios from 'axios';
+import axios  from 'axios';
 
 function Info() {
-  const { id } = useParams(); // Get the user ID from the URL parameters
-  const [user, setUser] = useState(null);
-  const [error, setError] = useState(null); // State to handle errors
-  const token = localStorage.getItem('token'); // Get the token for authorization
+  const { id } = useParams();
+  const token = localStorage.getItem('token');
+
+  const [user,    setUser]    = useState(null);
+  const [error,   setError]   = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      
-      try {
-        const response = await axios.get(`http://localhost:5000/api/uploads/getUserInfo/${id}`, { // Make sure this endpoint fetches the user by ID
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setUser(response.data); // Set user data
-      } catch (error) {
-        console.error('Error fetching user:', error);
-        setError('Error fetching user data'); // Set error state
-      }
-    };
+    console.log('Fetching user profile for ID:', id);
+    console.log('Using token:', token);
 
-    fetchUserProfile(); // Fetch user data
-  }, [id, token]);
-
-  const sendFriendRequest = async () => {
-    if (!token) {
-      console.error('No token found in localStorage');
+    // If we don’t have an id or token, bail out *and* clear loading
+    if (!id || !token) {
+      setError('Missing user ID or auth token.');
+      setLoading(false);
       return;
     }
 
+    const fetchUserProfile = async () => {
+      try {
+        setLoading(true);
+        const response  = await axios.get(
+          `https://chat-app-backend-ybof.onrender.com/api/uploads/getUserInfo/${id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setUser(response.data);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching user:', err);
+        setError('Could not load profile.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, [id, token]);
+
+  const sendFriendRequest = async () => {
     try {
       const response = await axios.post(
-        'http://localhost:5000/api/auth/friend-request',
-        { receiverId: id }, // Use the user ID from the fetched user data
+        'https://chat-app-backend-ybof.onrender.com/api/auth/friend-request',
+        {  receiverId: id },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      console.log('Friend request sent:', response.data);
+      alert(response.data.message || 'Friend request sent!');
     } catch (error) {
-      console.error('Error sending friend request:', error);
+      console.error('Error sending friend request:', error.message);
     }
   };
 
-  if (error) {
-    return <div>{error}</div>; // Display error if exists
-  }
 
-  if (!user) {
-    return <div>Loading...</div>; // Loading state
-  }
+  // Render
+  if (loading)  return <div>Loading profile…</div>;
+  if (error)    return <div className="text-red-500">{error}</div>;
+
+  // Build image URL (cache‑bust querystring)
+  const imgSrc =
+  user.profilepic?.url
+    ? `${user.profilepic.url}?t=${Date.now()}`  // optional cache busting
+    : '/default.jpg';
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center bg-white p-6 rounded-lg shadow-md">
       <img
-        src={user.profilepic && user.profilepic !== "default.jpg"
-          ? `http://localhost:5000/uploads/${user.profilepic}?${new Date().getTime()}`
-          : `http://localhost:5000/assets/default.jpg`}
+        src={imgSrc}
         alt={`${user.username}'s avatar`}
-        className="w-48 h-48 rounded-full"
+        className="w-48 h-48 rounded-full shadow mb-4"
       />
-      <h2 className="mt-4 text-2xl font-bold">{user.username}</h2>
-      <p className="mt-2 text-center">{user.description}</p>
-      <button 
-        onClick={sendFriendRequest} // Attach the friend request function
-        className="mt-4 bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition"
+      <h2 className="text-2xl font-bold">{user.username}</h2>
+      <p className="mt-2 text-center text-gray-700">
+        {user.description || 'No description provided.'}
+      </p>
+      <button
+       onClick={() => sendFriendRequest()}
+
+        className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
       >
         Send Friend Request
       </button>
@@ -75,6 +90,3 @@ function Info() {
 }
 
 export default Info;
-
-
-

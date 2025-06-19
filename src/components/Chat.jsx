@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 
-const socket = io('http://localhost:5000'); // Update with your server URL
+const socket = io('https://chat-app-backend-ybof.onrender.com'); // Update with your server URL
 
 const Chat = () => {
     const { friendId } = useParams();
@@ -23,7 +23,7 @@ const Chat = () => {
             }
 
             try {
-                const response = await axios.get(`http://localhost:5000/api/messages/${user.id}/${friendId}`, {
+                const response = await axios.get(`https://chat-app-backend-ybof.onrender.com/api/messages/${user.id}/${friendId}`, {
                     headers: {
                         Authorization: `Bearer ${user.token}`, // Assuming the token is stored in the user object
                     },
@@ -59,7 +59,7 @@ const Chat = () => {
     
         try {
             // Send the message data to the backend
-            await axios.post('http://localhost:5000/api/messages', messageData, {
+            await axios.post('https://chat-app-backend-ybof.onrender.com/api/messages', messageData, {
                 headers: {
                     Authorization: `Bearer ${user.token}`,
                 },

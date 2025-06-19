@@ -10,7 +10,7 @@ const FriendList = () => {
         const fetchFriends = async () => {
             if (user) {
                 try {
-                    const response = await axios.get('http://localhost:5000/api/auth/friends', {
+                    const response = await axios.get('https://chat-app-backend-ybof.onrender.com/api/auth/friends', {
                         headers: { Authorization: `Bearer ${user.token}` } // Ensure token is included
                     });
                     setFriends(response.data);
@@ -26,7 +26,7 @@ const FriendList = () => {
     const removeFriend = async (friendId) => {
         try {
             await axios.post(
-                'http://localhost:5000/api/auth/remove-friend', // Endpoint for removing a friend
+                'https://chat-app-backend-ybof.onrender.com/api/auth/remove-friend', // Endpoint for removing a friend
                 { friendId }, // Send the friend's ID in the body
                 {
                     headers: { Authorization: `Bearer ${user.token}` } // Include authorization token

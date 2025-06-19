@@ -14,7 +14,7 @@ const ChatList = () => {
         const fetchFriends = async () => {
             if (user) {
                 try {
-                    const response = await axios.get('http://localhost:5000/api/auth/friends', {
+                    const response = await axios.get('https://chat-app-backend-ybof.onrender.com/api/auth/friends', {
                         headers: { Authorization: `Bearer ${user.token}` }
                     });
                     setFriends(response.data);

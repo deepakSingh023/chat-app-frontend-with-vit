@@ -13,7 +13,7 @@ const PendingRequest = () => {
             }
 
             try {
-                const response = await axios.get('http://localhost:5000/api/auth/pending-requests', {
+                const response = await axios.get('https://chat-app-backend-ybof.onrender.com/api/auth/pending-requests', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
 
@@ -44,7 +44,7 @@ const PendingRequest = () => {
     
         try {
             const response = await axios.post(
-                'http://localhost:5000/api/auth/accept-request',
+                'https://chat-app-backend-ybof.onrender.com/api/auth/accept-request',
                 { id: requestID },  // Sending request ID
                 {
                     headers: { Authorization: `Bearer ${token}` }
@@ -74,7 +74,7 @@ const PendingRequest = () => {
         }
 
         try{
-            const response=await axios.post('http://localhost:5000/api/auth/reject-request',
+            const response=await axios.post('https://chat-app-backend-ybof.onrender.com/api/auth/reject-request',
                 { id:requestID },
                 {
                     headers:{ Authorization: `Bearer ${token}` }

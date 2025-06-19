@@ -9,15 +9,17 @@ import FriendList from './components/FriendList'
 import Profile from './components/Profile';
 import PendingRequest from './components/PendingRequest';
 import ChatList from './components/ChatList';
+import Info from './components/Info';
 
 const App = () => {
     return (
         <AuthProvider>
             <Router>
                 <Routes>
-                    <Route path="/" exact element={<Home/>} />
-                    <Route path="/PendingRequest" exact element={<PendingRequest/>} />
-                    <Route path="/Profile" exact element={<Profile/>} />
+                    <Route path="/"  element={<Home/>} />
+                    <Route path="/PendingRequest" element={<PendingRequest/>} />
+                    <Route path="/Profile"  element={<Profile/>} />
+                    <Route path="/info/:id" exact element={<Info/>} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
                     <Route path="/FriendList" element={<FriendList />}/>
