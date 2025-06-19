@@ -110,11 +110,11 @@
 
 
 //import { useEffect, useState, useRef, useCallback } from 'react';
-import io from 'socket.io-client';
-import { useParams } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
-import { format, isToday, isYesterday } from 'date-fns';
+//import io from 'socket.io-client';
+//import { useParams } from 'react-router-dom';
+//import { useAuth } from '../context/AuthContext';
+//import axios from 'axios';
+//import { format, isToday, isYesterday } from 'date-fns';
 
 // Create socket instance outside component
 //const socket = io('https://chat-app-backend-ybof.onrender.com', {
