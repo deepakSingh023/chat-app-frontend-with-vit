@@ -114,6 +114,7 @@ import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 
+// Create socket instance outside component (single instance)
 const socket = io('https://chat-app-backend-ybof.onrender.com', {
   autoConnect: false,
   transports: ['websocket'],
@@ -127,6 +128,7 @@ const Chat = () => {
     const messagesEndRef = useRef(null);
     const socketInitialized = useRef(false);
     const userRef = useRef(user);
+    const tempIdRef = useRef(null); // Fix temp ID reference
 
     useEffect(() => {
         userRef.current = user;
@@ -149,7 +151,9 @@ const Chat = () => {
     useEffect(() => {
         if (!userRef.current?.id || !friendId) return;
 
+        // Initialize socket once with authentication
         if (!socketInitialized.current) {
+            socket.auth = { token: userRef.current.token };
             socket.connect();
             socketInitialized.current = true;
         }
@@ -157,26 +161,27 @@ const Chat = () => {
         fetchMessages();
 
         const handleReceiveMessage = (newMessage) => {
-            // Check if message is relevant to current chat
             const isRelevant = 
                 (newMessage.senderId === userRef.current.id && newMessage.receiverId === friendId) ||
                 (newMessage.senderId === friendId && newMessage.receiverId === userRef.current.id);
             
             if (isRelevant) {
                 setMessages(prev => {
+                    // Check if message already exists
                     if (prev.some(msg => msg._id === newMessage._id)) return prev;
                     
                     // Replace optimistic message if exists
-                    const existingIndex = prev.findIndex(
-                        msg => msg.isOptimistic && 
-                        msg.content === newMessage.content &&
-                        msg.senderId === newMessage.senderId
-                    );
-
-                    if (existingIndex !== -1) {
-                        const newMessages = [...prev];
-                        newMessages[existingIndex] = newMessage;
-                        return newMessages;
+                    if (tempIdRef.current) {
+                        const existingIndex = prev.findIndex(
+                            msg => msg._id === tempIdRef.current
+                        );
+                        
+                        if (existingIndex !== -1) {
+                            const newMessages = [...prev];
+                            newMessages[existingIndex] = newMessage;
+                            tempIdRef.current = null; // Reset temp ID
+                            return newMessages;
+                        }
                     }
                     
                     return [...prev, newMessage];
@@ -205,19 +210,18 @@ const Chat = () => {
             content: message.trim(),
         };
 
+        // Create temporary message with optimistic flag
+        tempIdRef.current = `temp-${Date.now()}`;
+        const optimisticMessage = {
+            ...messageData,
+            _id: tempIdRef.current,
+            timestamp: new Date().toISOString(),
+            sender: { username: userRef.current.username || 'You' },
+            isOptimistic: true
+        };
+
         try {
             setMessage('');
-            
-            // Create temporary message with optimistic flag
-            const tempId = `temp-${Date.now()}`;
-            const optimisticMessage = {
-                ...messageData,
-                _id: tempId,
-                timestamp: new Date().toISOString(),
-                sender: { username: userRef.current.username || 'You' },
-                isOptimistic: true
-            };
-
             setMessages(prev => [...prev, optimisticMessage]);
 
             await axios.post(
@@ -228,8 +232,9 @@ const Chat = () => {
             
         } catch (error) {
             console.error('Error sending message:', error);
-            setMessages(prev => prev.filter(msg => msg._id !== tempId));
+            setMessages(prev => prev.filter(msg => msg._id !== tempIdRef.current));
             setMessage(messageData.content);
+            tempIdRef.current = null;
         }
     };
 
