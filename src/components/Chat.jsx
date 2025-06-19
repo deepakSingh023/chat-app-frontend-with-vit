@@ -127,43 +127,59 @@ const Chat = () => {
     const [message, setMessage] = useState('');
     const messagesEndRef = useRef(null);
     const socketInitialized = useRef(false);
-    const userRef = useRef(user);
-    const tempIdRef = useRef(null); // Fix temp ID reference
-
-    useEffect(() => {
-        userRef.current = user;
-    }, [user]);
+    const tempIdRef = useRef(null);
 
     const fetchMessages = useCallback(async () => {
-        if (!userRef.current?.id || !friendId) return;
+        if (!user?.id || !friendId) return;
         
         try {
             const response = await axios.get(
-                `https://chat-app-backend-ybof.onrender.com/api/messages/${userRef.current.id}/${friendId}`,
-                { headers: { Authorization: `Bearer ${userRef.current.token}` } }
+                `https://chat-app-backend-ybof.onrender.com/api/messages/${user.id}/${friendId}`,
+                { headers: { Authorization: `Bearer ${user.token}` } }
             );
             setMessages(response.data);
         } catch (error) {
             console.error('Error fetching messages:', error);
         }
-    }, [friendId]);
+    }, [user, friendId]);
 
+    // Socket connection and authentication
     useEffect(() => {
-        if (!userRef.current?.id || !friendId) return;
+        if (!user?.token) return;
 
-        // Initialize socket once with authentication
-        if (!socketInitialized.current) {
-            socket.auth = { token: userRef.current.token };
+        // Update socket authentication with current token
+        socket.auth = { token: user.token };
+        
+        if (!socket.connected) {
             socket.connect();
             socketInitialized.current = true;
         }
+
+        // Reconnect if socket gets disconnected
+        const handleDisconnect = () => {
+            if (user?.token) {
+                socket.auth = { token: user.token };
+                socket.connect();
+            }
+        };
+
+        socket.on('disconnect', handleDisconnect);
+
+        return () => {
+            socket.off('disconnect', handleDisconnect);
+        };
+    }, [user]);
+
+    // Message handling and event listeners
+    useEffect(() => {
+        if (!user?.id || !friendId) return;
 
         fetchMessages();
 
         const handleReceiveMessage = (newMessage) => {
             const isRelevant = 
-                (newMessage.senderId === userRef.current.id && newMessage.receiverId === friendId) ||
-                (newMessage.senderId === friendId && newMessage.receiverId === userRef.current.id);
+                (newMessage.senderId === user.id && newMessage.receiverId === friendId) ||
+                (newMessage.senderId === friendId && newMessage.receiverId === user.id);
             
             if (isRelevant) {
                 setMessages(prev => {
@@ -179,7 +195,7 @@ const Chat = () => {
                         if (existingIndex !== -1) {
                             const newMessages = [...prev];
                             newMessages[existingIndex] = newMessage;
-                            tempIdRef.current = null; // Reset temp ID
+                            tempIdRef.current = null;
                             return newMessages;
                         }
                     }
@@ -194,7 +210,7 @@ const Chat = () => {
         return () => {
             socket.off('receiveMessage', handleReceiveMessage);
         };
-    }, [fetchMessages, friendId]);
+    }, [fetchMessages, friendId, user]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -202,10 +218,10 @@ const Chat = () => {
 
     const sendMessage = async (e) => {
         e?.preventDefault();
-        if (!message.trim() || !userRef.current?.id || !friendId) return;
+        if (!message.trim() || !user?.id || !friendId) return;
 
         const messageData = {
-            senderId: userRef.current.id,
+            senderId: user.id,
             receiverId: friendId,
             content: message.trim(),
         };
@@ -216,7 +232,7 @@ const Chat = () => {
             ...messageData,
             _id: tempIdRef.current,
             timestamp: new Date().toISOString(),
-            sender: { username: userRef.current.username || 'You' },
+            sender: { username: user.username || 'You' },
             isOptimistic: true
         };
 
@@ -227,7 +243,7 @@ const Chat = () => {
             await axios.post(
                 'https://chat-app-backend-ybof.onrender.com/api/messages',
                 messageData,
-                { headers: { Authorization: `Bearer ${userRef.current.token}` } }
+                { headers: { Authorization: `Bearer ${user.token}` } }
             );
             
         } catch (error) {
