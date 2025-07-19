@@ -63,8 +63,8 @@ const Chat = () => {
         if (!user || !friendId || (!message && !file)) return;
 
         const formData = new FormData();
-        formData.append('senderId', user.id);
-        formData.append('receiverId', friendId);
+        formData.append('sender', user.id);
+        formData.append('receiver', friendId);
         formData.append('content', message);
         if (file) {
             formData.append('file', file);
