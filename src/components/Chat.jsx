@@ -17,6 +17,8 @@ const Chat = () => {
 
     useEffect(() => {
         if (!user || !friendId) return;
+        console.log('User ID:', user.id);
+        console.log('Friend ID:', friendId);
 
         // Fetch previous messages
         const fetchMessages = async () => {
