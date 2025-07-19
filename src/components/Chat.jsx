@@ -16,46 +16,42 @@ const Chat = () => {
     const chatEndRef = useRef(null);
 
     useEffect(() => {
-        if (!user || !friendId) return;
-        console.log('User ID:', user.id);
-        console.log('Friend ID:', friendId);
+    const fetchMessages = async () => {
+        try {
+            const response = await axios.get(
+                `https://chat-app-backend-ybof.onrender.com/api/messages/${user.id}/${friendId}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${user.token}`,
+                    },
+                }
+            );
+            setMessages(response.data);
+        } catch (error) {
+            console.error('Error fetching messages:', error);
+        }
+    };
 
-        // Fetch previous messages
-        const fetchMessages = async () => {
-            try {
-                const response = await axios.get(
-                    `https://chat-app-backend-ybof.onrender.com/api/messages/${user.id}/${friendId}`,
-                    {
-                        headers: {
-                            Authorization: `Bearer ${user.token}`,
-                        },
-                    }
-                );
-                setMessages(response.data);
-            } catch (error) {
-                console.error('Error fetching messages:', error);
-            }
-        };
+    fetchMessages();
 
-        fetchMessages();
+    // Emit online status check
+    socket.emit('userOnline', friendId);
 
-        // Socket listeners
-        socket.emit('userOnline', user.id);
-        socket.emit('checkOnline', friendId);
+    // Listen once
+    socket.on('onlineStatus', (isOnline) => {
+        setIsFriendOnline(isOnline);
+    });
 
-        socket.on('receiveMessage', (newMessage) => {
-            setMessages((prev) => [...prev, newMessage]);
-        });
+    socket.on('receiveMessage', (message) => {
+        setMessages(prev => [...prev, message]);
+    });
 
-        socket.on('onlineStatus', (isOnline) => {
-            setIsFriendOnline(isOnline);
-        });
+    return () => {
+        socket.off('onlineStatus');
+        socket.off('receiveMessage');
+    };
+}, [user, friendId]);
 
-        return () => {
-            socket.off('receiveMessage');
-            socket.off('onlineStatus');
-        };
-    }, [user, friendId]);
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
