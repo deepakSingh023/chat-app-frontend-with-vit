@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 
+// Move socket outside component to prevent recreating on every render
 const socket = io('https://chat-app-backend-ybof.onrender.com');
 
 const Chat = () => {
@@ -13,62 +14,86 @@ const Chat = () => {
     const [message, setMessage] = useState('');
     const [file, setFile] = useState(null);
     const [isFriendOnline, setIsFriendOnline] = useState(false);
+    const [isLoading, setIsLoading] = useState(false); // Add loading state
     const chatEndRef = useRef(null);
+    const fileInputRef = useRef(null); // Add ref for file input
 
- 
     useEffect(() => {
-  if (!user || !friendId) return;
+        if (!user || !friendId) return;
 
-  // Register the current user (yourself)
-  socket.emit('registerUser', user.id);
+        // Register the current user
+        socket.emit('registerUser', user.id);
 
-  // Check if the friend is online
-  socket.emit('userOnline', friendId);
+        // Join a room for this specific chat
+        const roomId = [user.id, friendId].sort().join('-');
+        socket.emit('joinRoom', roomId);
 
-  // Listen to friend online status
-  socket.on('onlineStatus', (isOnline) => {
-    setIsFriendOnline(isOnline);
-  });
+        // Check if friend is online
+        socket.emit('checkUserOnline', friendId);
 
-  // Always listen for messages
-  socket.on('receiveMessage', (message) => {
-    setMessages((prev) => [...prev, message]);
-  });
+        // Listen for friend's online status
+        socket.on('userOnlineStatus', (data) => {
+            if (data.userId === friendId) {
+                setIsFriendOnline(data.isOnline);
+            }
+        });
 
-  // Fetch previous messages from API
-  const fetchMessages = async () => {
-    try {
-      const response = await axios.get(
-        `https://chat-app-backend-ybof.onrender.com/api/messages/${user.id}/${friendId}`,
-        { headers: { Authorization: `Bearer ${user.token}` } }
-      );
-      setMessages(response.data);
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-    }
-  };
-  fetchMessages();
+        // Listen for user coming online/offline
+        socket.on('userStatusUpdate', (data) => {
+            if (data.userId === friendId) {
+                setIsFriendOnline(data.isOnline);
+            }
+        });
 
-  return () => {
-    socket.off('onlineStatus');
-    socket.off('receiveMessage');
-  };
-}, [user, friendId]);
+        // Listen for messages - only add if not already in messages array
+        socket.on('receiveMessage', (newMessage) => {
+            setMessages((prevMessages) => {
+                // Check if message already exists to prevent duplicates
+                const messageExists = prevMessages.some(msg => msg._id === newMessage._id);
+                if (messageExists) {
+                    return prevMessages;
+                }
+                return [...prevMessages, newMessage];
+            });
+        });
 
+        // Fetch previous messages
+        const fetchMessages = async () => {
+            try {
+                const response = await axios.get(
+                    `https://chat-app-backend-ybof.onrender.com/api/messages/${user.id}/${friendId}`,
+                    { headers: { Authorization: `Bearer ${user.token}` } }
+                );
+                setMessages(response.data);
+            } catch (error) {
+                console.error('Error fetching messages:', error);
+            }
+        };
+        
+        fetchMessages();
 
-
+        // Cleanup function
+        return () => {
+            socket.off('userOnlineStatus');
+            socket.off('userStatusUpdate');
+            socket.off('receiveMessage');
+            socket.emit('leaveRoom', roomId);
+        };
+    }, [user, friendId]);
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
     const sendMessage = async () => {
-        if (!user || !friendId || (!message && !file)) return;
+        if (!user || !friendId || (!message.trim() && !file)) return;
+        
+        setIsLoading(true); // Start loading
 
         const formData = new FormData();
         formData.append('sender', user.id);
         formData.append('receiver', friendId);
-        formData.append('content', message);
+        formData.append('content', message.trim());
         if (file) {
             formData.append('file', file);
         }
@@ -86,17 +111,47 @@ const Chat = () => {
             );
 
             const newMessage = response.data;
-            socket.emit('sendMessage', newMessage);
-            setMessages((prev) => [...prev, newMessage]);
+            
+            // Create room ID for targeted message sending
+            const roomId = [user.id, friendId].sort().join('-');
+            
+            // Emit to specific room instead of broadcasting
+            socket.emit('sendMessage', {
+                ...newMessage,
+                roomId: roomId
+            });
+
+            // Only add to local state if it's not already there
+            setMessages((prevMessages) => {
+                const messageExists = prevMessages.some(msg => msg._id === newMessage._id);
+                if (messageExists) {
+                    return prevMessages;
+                }
+                return [...prevMessages, newMessage];
+            });
+
+            // Clear inputs
             setMessage('');
             setFile(null);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = ''; // Clear file input display
+            }
         } catch (error) {
             console.error('Error sending message:', error);
+        } finally {
+            setIsLoading(false); // End loading
         }
     };
 
     const handleFileChange = (e) => {
         setFile(e.target.files[0]);
+    };
+
+    const handleKeyPress = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
     };
 
     if (!user || !friendId) return <div>Loading or invalid chat...</div>;
@@ -154,21 +209,37 @@ const Chat = () => {
                 <div ref={chatEndRef} />
             </div>
 
-            <input
-                type="text"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                style={{ width: '60%', padding: '10px', marginRight: '10px' }}
-                placeholder="Type your message"
-            />
-            <input
-                type="file"
-                onChange={handleFileChange}
-                style={{ marginRight: '10px' }}
-            />
-            <button onClick={sendMessage} style={{ padding: '10px 20px' }}>
-                Send
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <input
+                    type="text"
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    style={{ flex: 1, padding: '10px' }}
+                    placeholder="Type your message"
+                    disabled={isLoading}
+                />
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    onChange={handleFileChange}
+                    disabled={isLoading}
+                />
+                <button 
+                    onClick={sendMessage} 
+                    disabled={isLoading || (!message.trim() && !file)}
+                    style={{ 
+                        padding: '10px 20px',
+                        backgroundColor: isLoading ? '#ccc' : '#007bff',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '5px',
+                        cursor: isLoading ? 'not-allowed' : 'pointer'
+                    }}
+                >
+                    {isLoading ? 'Sending...' : 'Send'}
+                </button>
+            </div>
         </div>
     );
 };
