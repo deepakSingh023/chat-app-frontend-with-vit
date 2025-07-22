@@ -14,12 +14,16 @@ const Chat = () => {
     const [message, setMessage] = useState('');
     const [file, setFile] = useState(null);
     const [isFriendOnline, setIsFriendOnline] = useState(false);
-    const [isLoading, setIsLoading] = useState(false); // Add loading state
+    const [isLoading, setIsLoading] = useState(false);
     const chatEndRef = useRef(null);
-    const fileInputRef = useRef(null); // Add ref for file input
+    const fileInputRef = useRef(null);
+    const processedMessages = useRef(new Set()); // Track processed message IDs
 
     useEffect(() => {
         if (!user || !friendId) return;
+
+        // Clear processed messages when chat changes
+        processedMessages.current.clear();
 
         // Register the current user
         socket.emit('registerUser', user.id);
@@ -32,30 +36,41 @@ const Chat = () => {
         socket.emit('checkUserOnline', friendId);
 
         // Listen for friend's online status
-        socket.on('userOnlineStatus', (data) => {
+        const handleUserOnlineStatus = (data) => {
             if (data.userId === friendId) {
                 setIsFriendOnline(data.isOnline);
             }
-        });
+        };
 
         // Listen for user coming online/offline
-        socket.on('userStatusUpdate', (data) => {
+        const handleUserStatusUpdate = (data) => {
             if (data.userId === friendId) {
                 setIsFriendOnline(data.isOnline);
             }
-        });
+        };
 
-        // Listen for messages - only add if not already in messages array
-        socket.on('receiveMessage', (newMessage) => {
+        // Listen for messages with duplicate prevention
+        const handleReceiveMessage = (newMessage) => {
+            // Skip if we've already processed this message
+            if (processedMessages.current.has(newMessage._id)) {
+                return;
+            }
+
+            processedMessages.current.add(newMessage._id);
+            
             setMessages((prevMessages) => {
-                // Check if message already exists to prevent duplicates
+                // Double-check for duplicates in current state
                 const messageExists = prevMessages.some(msg => msg._id === newMessage._id);
                 if (messageExists) {
                     return prevMessages;
                 }
                 return [...prevMessages, newMessage];
             });
-        });
+        };
+
+        socket.on('userOnlineStatus', handleUserOnlineStatus);
+        socket.on('userStatusUpdate', handleUserStatusUpdate);
+        socket.on('receiveMessage', handleReceiveMessage);
 
         // Fetch previous messages
         const fetchMessages = async () => {
@@ -64,6 +79,13 @@ const Chat = () => {
                     `https://chat-app-backend-ybof.onrender.com/api/messages/${user.id}/${friendId}`,
                     { headers: { Authorization: `Bearer ${user.token}` } }
                 );
+                
+                // Clear and rebuild processed messages set
+                processedMessages.current.clear();
+                response.data.forEach(msg => {
+                    processedMessages.current.add(msg._id);
+                });
+                
                 setMessages(response.data);
             } catch (error) {
                 console.error('Error fetching messages:', error);
@@ -74,9 +96,9 @@ const Chat = () => {
 
         // Cleanup function
         return () => {
-            socket.off('userOnlineStatus');
-            socket.off('userStatusUpdate');
-            socket.off('receiveMessage');
+            socket.off('userOnlineStatus', handleUserOnlineStatus);
+            socket.off('userStatusUpdate', handleUserStatusUpdate);
+            socket.off('receiveMessage', handleReceiveMessage);
             socket.emit('leaveRoom', roomId);
         };
     }, [user, friendId]);
@@ -88,7 +110,7 @@ const Chat = () => {
     const sendMessage = async () => {
         if (!user || !friendId || (!message.trim() && !file)) return;
         
-        setIsLoading(true); // Start loading
+        setIsLoading(true);
 
         const formData = new FormData();
         formData.append('sender', user.id);
@@ -112,16 +134,21 @@ const Chat = () => {
 
             const newMessage = response.data;
             
+            // Add to processed messages to prevent duplicates
+            processedMessages.current.add(newMessage._id);
+            
             // Create room ID for targeted message sending
             const roomId = [user.id, friendId].sort().join('-');
             
-            // Emit to specific room instead of broadcasting
+            // Emit to specific room
             socket.emit('sendMessage', {
                 ...newMessage,
-                roomId: roomId
+                roomId: roomId,
+                sender: newMessage.sender,
+                receiver: newMessage.receiver
             });
 
-            // Only add to local state if it's not already there
+            // Add to local state immediately for sender
             setMessages((prevMessages) => {
                 const messageExists = prevMessages.some(msg => msg._id === newMessage._id);
                 if (messageExists) {
@@ -134,12 +161,12 @@ const Chat = () => {
             setMessage('');
             setFile(null);
             if (fileInputRef.current) {
-                fileInputRef.current.value = ''; // Clear file input display
+                fileInputRef.current.value = '';
             }
         } catch (error) {
             console.error('Error sending message:', error);
         } finally {
-            setIsLoading(false); // End loading
+            setIsLoading(false);
         }
     };
 
@@ -151,6 +178,63 @@ const Chat = () => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendMessage();
+        }
+    };
+
+    const renderMessageContent = (msg) => {
+        if (msg.fileUrl) {
+            const isImage = msg.fileName && /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(msg.fileName);
+            
+            if (isImage) {
+                return (
+                    <div>
+                        <img 
+                            src={msg.fileUrl} 
+                            alt={msg.fileName || 'Image'} 
+                            style={{ 
+                                maxWidth: '200px', 
+                                maxHeight: '200px', 
+                                borderRadius: '8px',
+                                cursor: 'pointer'
+                            }}
+                            onClick={() => window.open(msg.fileUrl, '_blank')}
+                        />
+                        {msg.fileName && <div style={{ fontSize: '0.8em', marginTop: '4px' }}>{msg.fileName}</div>}
+                    </div>
+                );
+            } else {
+                return (
+                    <a 
+                        href={msg.fileUrl} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        style={{ 
+                            color: '#007bff', 
+                            textDecoration: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                        }}
+                    >
+                        📎 {msg.fileName || 'Download File'}
+                    </a>
+                );
+            }
+        } else if (msg.content) {
+            return (
+                <>
+                    <strong>{msg.sender.username || msg.sender}: </strong>
+                    {msg.content}
+                </>
+            );
+        } else {
+            // Handle case where message has neither content nor file
+            return (
+                <em style={{ color: '#999' }}>
+                    <strong>{msg.sender.username || msg.sender}: </strong>
+                    [Message content unavailable]
+                </em>
+            );
         }
     };
 
@@ -170,7 +254,7 @@ const Chat = () => {
                 }}
             >
                 {messages.map((msg) => {
-                    const isSender = msg.sender._id === user.id;
+                    const isSender = msg.sender._id === user.id || msg.sender === user.id;
                     return (
                         <div
                             key={msg._id}
@@ -187,18 +271,10 @@ const Chat = () => {
                                     backgroundColor: isSender ? '#d4f8d4' : '#ffffff',
                                     maxWidth: '70%',
                                     wordWrap: 'break-word',
+                                    border: '1px solid #ddd',
                                 }}
                             >
-                                {msg.fileUrl ? (
-                                    <a href={msg.fileUrl} target="_blank" rel="noreferrer">
-                                        📎 {msg.fileName || 'File'}
-                                    </a>
-                                ) : (
-                                    <>
-                                        <strong>{msg.sender.username}: </strong>
-                                        {msg.content}
-                                    </>
-                                )}
+                                {renderMessageContent(msg)}
                                 <div style={{ fontSize: '0.7em', color: '#666', marginTop: '4px' }}>
                                     {new Date(msg.timestamp).toLocaleTimeString()}
                                 </div>
@@ -240,6 +316,12 @@ const Chat = () => {
                     {isLoading ? 'Sending...' : 'Send'}
                 </button>
             </div>
+
+            {file && (
+                <div style={{ marginTop: '10px', padding: '5px', background: '#f0f0f0', borderRadius: '5px' }}>
+                    Selected file: {file.name}
+                </div>
+            )}
         </div>
     );
 };
