@@ -15,6 +15,7 @@ const Chat = () => {
     const [file, setFile] = useState(null);
     const [isFriendOnline, setIsFriendOnline] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [friendInfo, setFriendInfo] = useState(null);
     const chatEndRef = useRef(null);
     const fileInputRef = useRef(null);
     const processedMessages = useRef(new Set()); // Track processed message IDs
@@ -72,6 +73,19 @@ const Chat = () => {
         socket.on('userStatusUpdate', handleUserStatusUpdate);
         socket.on('receiveMessage', handleReceiveMessage);
 
+        // Fetch friend information
+        const fetchFriendInfo = async () => {
+            try {
+                const response = await axios.get(
+                    `https://chat-app-backend-ybof.onrender.com/api/users/getFriendInfo/${friendId}`,
+                    { headers: { Authorization: `Bearer ${user.token}` } }
+                );
+                setFriendInfo(response.data);
+            } catch (error) {
+                console.error('Error fetching friend info:', error);
+            }
+        };
+
         // Fetch previous messages
         const fetchMessages = async () => {
             try {
@@ -92,6 +106,7 @@ const Chat = () => {
             }
         };
         
+        fetchFriendInfo();
         fetchMessages();
 
         // Cleanup function
@@ -182,17 +197,24 @@ const Chat = () => {
     };
 
     const renderMessageContent = (msg) => {
+        // Get sender name - check if it's the current user or friend
+        const isSender = msg.sender._id === user.id || msg.sender === user.id;
+        const senderName = isSender ? user.username : (friendInfo?.username || 'Friend');
+        
         if (msg.fileUrl) {
             const isImage = msg.fileName && /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(msg.fileName);
             
             if (isImage) {
                 return (
                     <div>
+                        <div style={{ fontSize: '0.9em', fontWeight: 'bold', marginBottom: '4px' }}>
+                            {senderName}
+                        </div>
                         <img 
                             src={msg.fileUrl} 
                             alt={msg.fileName || 'Image'} 
                             style={{ 
-                                maxWidth: '200px', 
+                                maxWidth: '100%', 
                                 maxHeight: '200px', 
                                 borderRadius: '8px',
                                 cursor: 'pointer'
@@ -204,36 +226,45 @@ const Chat = () => {
                 );
             } else {
                 return (
-                    <a 
-                        href={msg.fileUrl} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        style={{ 
-                            color: '#007bff', 
-                            textDecoration: 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '5px'
-                        }}
-                    >
-                        📎 {msg.fileName || 'Download File'}
-                    </a>
+                    <div>
+                        <div style={{ fontSize: '0.9em', fontWeight: 'bold', marginBottom: '4px' }}>
+                            {senderName}
+                        </div>
+                        <a 
+                            href={msg.fileUrl} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            style={{ 
+                                color: '#007bff', 
+                                textDecoration: 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px'
+                            }}
+                        >
+                            📎 {msg.fileName || 'Download File'}
+                        </a>
+                    </div>
                 );
             }
         } else if (msg.content) {
             return (
-                <>
-                    <strong>{msg.sender.username || msg.sender}: </strong>
-                    {msg.content}
-                </>
+                <div>
+                    <div style={{ fontSize: '0.9em', fontWeight: 'bold', marginBottom: '4px' }}>
+                        {senderName}
+                    </div>
+                    <div>{msg.content}</div>
+                </div>
             );
         } else {
             // Handle case where message has neither content nor file
             return (
-                <em style={{ color: '#999' }}>
-                    <strong>{msg.sender.username || msg.sender}: </strong>
-                    [Message content unavailable]
-                </em>
+                <div>
+                    <div style={{ fontSize: '0.9em', fontWeight: 'bold', marginBottom: '4px' }}>
+                        {senderName}
+                    </div>
+                    <em style={{ color: '#999' }}>[Message content unavailable]</em>
+                </div>
             );
         }
     };
@@ -241,16 +272,71 @@ const Chat = () => {
     if (!user || !friendId) return <div>Loading or invalid chat...</div>;
 
     return (
-        <div style={{ padding: '20px', border: '1px solid #ccc', borderRadius: '5px' }}>
-            <h2>Chat with Friend ({isFriendOnline ? '🟢 Online' : '⚪ Offline'})</h2>
+        <div style={{ 
+            padding: '10px', 
+            border: '1px solid #ccc', 
+            borderRadius: '5px', 
+            maxWidth: '100%', 
+            minHeight: '100vh',
+            boxSizing: 'border-box'
+        }}>
+            {/* User and Friend Info Header */}
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '15px',
+                padding: '10px',
+                backgroundColor: '#f8f9fa',
+                borderRadius: '8px',
+                flexWrap: 'wrap',
+                gap: '10px'
+            }}>
+                <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    minWidth: '120px'
+                }}>
+                    <div style={{ fontSize: '0.9em', color: '#666', marginBottom: '2px' }}>You</div>
+                    <div style={{ fontWeight: 'bold', fontSize: '1.1em' }}>{user.username}</div>
+                </div>
+                <div style={{
+                    fontSize: '1.5em',
+                    color: '#007bff',
+                    display: 'flex',
+                    alignItems: 'center'
+                }}>💬</div>
+                <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-end',
+                    minWidth: '120px'
+                }}>
+                    <div style={{ fontSize: '0.9em', color: '#666', marginBottom: '2px' }}>
+                        {isFriendOnline ? '🟢 Online' : '⚪ Offline'}
+                    </div>
+                    <div style={{ fontWeight: 'bold', fontSize: '1.1em' }}>{friendInfo?.username || 'Friend'}</div>
+                </div>
+            </div>
+            
+            <h2 style={{ 
+                margin: '0 0 15px 0', 
+                fontSize: '1.3em',
+                textAlign: 'center',
+                display: 'none'
+            }}>Chat with {friendInfo?.username || 'Friend'} ({isFriendOnline ? '🟢 Online' : '⚪ Offline'})</h2>
             <div
                 style={{
-                    maxHeight: '400px',
+                    height: 'calc(100vh - 250px)',
+                    minHeight: '300px',
+                    maxHeight: '600px',
                     overflowY: 'auto',
-                    marginBottom: '20px',
+                    marginBottom: '15px',
                     border: '1px solid #ddd',
                     padding: '10px',
                     background: '#f5f5f5',
+                    borderRadius: '8px'
                 }}
             >
                 {messages.map((msg) => {
@@ -266,12 +352,13 @@ const Chat = () => {
                             <div
                                 style={{
                                     display: 'inline-block',
-                                    padding: '10px',
-                                    borderRadius: '10px',
+                                    padding: '8px 12px',
+                                    borderRadius: '12px',
                                     backgroundColor: isSender ? '#d4f8d4' : '#ffffff',
-                                    maxWidth: '70%',
+                                    maxWidth: '85%',
                                     wordWrap: 'break-word',
                                     border: '1px solid #ddd',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
                                 }}
                             >
                                 {renderMessageContent(msg)}
@@ -285,13 +372,29 @@ const Chat = () => {
                 <div ref={chatEndRef} />
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                flexWrap: 'wrap',
+                padding: '10px',
+                backgroundColor: '#fff',
+                borderRadius: '8px',
+                border: '1px solid #ddd'
+            }}>
                 <input
                     type="text"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    style={{ flex: 1, padding: '10px' }}
+                    style={{ 
+                        flex: 1, 
+                        minWidth: '200px',
+                        padding: '12px', 
+                        border: '1px solid #ddd',
+                        borderRadius: '6px',
+                        fontSize: '16px' // Prevents zoom on iOS
+                    }}
                     placeholder="Type your message"
                     disabled={isLoading}
                 />
@@ -300,17 +403,25 @@ const Chat = () => {
                     type="file"
                     onChange={handleFileChange}
                     disabled={isLoading}
+                    style={{
+                        fontSize: '14px',
+                        minWidth: '100px'
+                    }}
                 />
                 <button 
                     onClick={sendMessage} 
                     disabled={isLoading || (!message.trim() && !file)}
                     style={{ 
-                        padding: '10px 20px',
+                        padding: '12px 20px',
                         backgroundColor: isLoading ? '#ccc' : '#007bff',
                         color: 'white',
                         border: 'none',
-                        borderRadius: '5px',
-                        cursor: isLoading ? 'not-allowed' : 'pointer'
+                        borderRadius: '6px',
+                        cursor: isLoading ? 'not-allowed' : 'pointer',
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                        minWidth: '80px',
+                        whiteSpace: 'nowrap'
                     }}
                 >
                     {isLoading ? 'Sending...' : 'Send'}
@@ -318,8 +429,15 @@ const Chat = () => {
             </div>
 
             {file && (
-                <div style={{ marginTop: '10px', padding: '5px', background: '#f0f0f0', borderRadius: '5px' }}>
-                    Selected file: {file.name}
+                <div style={{ 
+                    marginTop: '10px', 
+                    padding: '8px 12px', 
+                    background: '#e3f2fd', 
+                    borderRadius: '6px',
+                    border: '1px solid #bbdefb',
+                    fontSize: '14px'
+                }}>
+                    📎 Selected file: {file.name}
                 </div>
             )}
         </div>
