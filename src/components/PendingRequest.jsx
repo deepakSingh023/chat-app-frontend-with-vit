@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
 const PendingRequest = () => {
-    const [pendingRequests, setPendingRequests] = useState([]); 
-    const token = localStorage.getItem('token'); 
+    const [pendingRequests, setPendingRequests] = useState([]);
+    const token = localStorage.getItem('token');
 
     useEffect(() => {
         const fetchPendingRequests = async () => {
@@ -23,7 +23,7 @@ const PendingRequest = () => {
                     setPendingRequests(response.data.pendingRequests);
                 } else {
                     console.warn('Unexpected response structure:', response.data);
-                    setPendingRequests([]); 
+                    setPendingRequests([]);
                 }
             } catch (error) {
                 console.error('Error fetching pending friend requests:', error);
@@ -35,80 +35,96 @@ const PendingRequest = () => {
 
     const acceptFriendRequest = async (requestID) => {
         const token = localStorage.getItem('token');
-        console.log('Sending friend request ID:', requestID);  // Log requestID to ensure it's valid
-    
+        console.log('Accepting friend request ID:', requestID);
+
         if (!token) {
             console.error('No token found in localStorage');
             return;
         }
-    
+
         try {
-            const response = await axios.post(
+            await axios.post(
                 'https://chat-app-backend-ybof.onrender.com/api/auth/accept-request',
-                { id: requestID },  // Sending request ID
+                { id: requestID },
                 {
                     headers: { Authorization: `Bearer ${token}` }
                 }
             );
-    
+
             setPendingRequests((prev) =>
                 prev.filter((request) => request.userId !== requestID)
             );
-    
+
             alert('Friend request accepted!');
         } catch (error) {
-            if (error.response) {
-                console.error('Error accepting friend request:', error.response.data);
-            } else {
-                console.error('Error sending friend request:', error.message);
-            }
+            console.error('Error accepting friend request:', error.response?.data || error.message);
         }
     };
 
-    const rejectFriendRequest=async (requestID)=>{
-        const token= localStorage.getItem('token');
+    const rejectFriendRequest = async (requestID) => {
+        const token = localStorage.getItem('token');
 
         if (!token) {
             console.error('No token found in localStorage');
             return;
         }
 
-        try{
-            const response=await axios.post('https://chat-app-backend-ybof.onrender.com/api/auth/reject-request',
-                { id:requestID },
+        try {
+            await axios.post(
+                'https://chat-app-backend-ybof.onrender.com/api/auth/reject-request',
+                { id: requestID },
                 {
-                    headers:{ Authorization: `Bearer ${token}` }
+                    headers: { Authorization: `Bearer ${token}` }
                 }
-            )
+            );
+
             setPendingRequests((prev) =>
                 prev.filter((request) => request.userId !== requestID)
             );
-        }catch(error){
-            if (error.response) {
-                console.error('Error rejecting friend request:', error.response.data);
-            }
+        } catch (error) {
+            console.error('Error rejecting friend request:', error.response?.data || error.message);
         }
-    }
+    };
 
     return (
-        <div>
-            <h3>Pending Friend Requests</h3>
-            <ul>
+        <div className="min-h-screen bg-white text-gray-800">
+            {/* Header */}
+            <header className="bg-gradient-to-r from-blue-600 to-green-500 shadow-md text-white px-6 py-4">
+                <h1 className="text-2xl font-bold">Friend Requests</h1>
+            </header>
+
+            {/* Content */}
+            <main className="max-w-3xl mx-auto p-6">
+                <h2 className="text-xl font-semibold mb-4">Pending Friend Requests</h2>
+
                 {pendingRequests.length > 0 ? (
-                    pendingRequests.map(request => (
-                        <li key={request.userId}>
-                            {request.username} 
-                            <button onClick={() => acceptFriendRequest(request.userId)}>Accept Friend Request</button>
-                            <button onClick={()=> rejectFriendRequest(request.userId)}>Reject Friend Request</button>
-                        </li>
-                    ))
+                    <ul className="space-y-4">
+                        {pendingRequests.map((request) => (
+                            <li key={request.userId} className="bg-gray-100 p-4 rounded-lg shadow-sm flex justify-between items-center">
+                                <span className="font-medium text-lg">{request.username}</span>
+                                <div className="space-x-2">
+                                    <button
+                                        onClick={() => acceptFriendRequest(request.userId)}
+                                        className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg transition"
+                                    >
+                                        Accept
+                                    </button>
+                                    <button
+                                        onClick={() => rejectFriendRequest(request.userId)}
+                                        className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg transition"
+                                    >
+                                        Reject
+                                    </button>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
                 ) : (
-                    <p>No pending friend requests</p>
+                    <p className="text-gray-600 text-center mt-10">No pending friend requests</p>
                 )}
-            </ul>
+            </main>
         </div>
     );
 };
-
 
 export default PendingRequest;
