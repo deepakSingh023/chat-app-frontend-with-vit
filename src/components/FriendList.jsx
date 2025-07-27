@@ -42,15 +42,28 @@ const FriendList = () => {
 
     return (
         <div>
-            <h3>Friends</h3>
-            <ul>
-                {friends.map(friend => (
-                    <li key={friend._id}>
-                        {friend.username}
-                        <button onClick={() => removeFriend(friend._id)}>Remove</button> {/* Add Remove button */}
-                    </li>
-                ))}
+            <header className='text-center border shadow-md border-black rounded-md m-1 p-6'>
+                <h1 className='text-4xl'>Friends</h1>
+            </header>
+            <ul className="flex flex-col items-center justify-center min-h-[50vh]">
+              {friends.length > 0 ? (
+                friends.map(friend => (
+                  <li key={friend._id} className="flex justify-between items-center border border-black m-3 p-3 rounded-md shadow-md w-full max-w-md"
+                        >
+                    <span>{friend.username}</span>
+                    <button
+                      onClick={() => removeFriend(friend._id)}
+                      className="bg-red-500 text-white px-4 py-1 rounded hover:bg-red-600"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))
+              ) : (
+                <li className="text-2xl text-gray-500">No friends found</li>
+              )}
             </ul>
+
         </div>
     );
 };
