@@ -207,40 +207,29 @@ const Chat = () => {
             if (isImage) {
                 return (
                     <div>
-                        <div style={{ fontSize: '0.9em', fontWeight: 'bold', marginBottom: '4px' }}>
+                        <div className="text-sm font-bold mb-1">
                             {senderName}
                         </div>
                         <img 
                             src={msg.fileUrl} 
                             alt={msg.fileName || 'Image'} 
-                            style={{ 
-                                maxWidth: '100%', 
-                                maxHeight: '200px', 
-                                borderRadius: '8px',
-                                cursor: 'pointer'
-                            }}
+                            className="max-w-full max-h-48 rounded-lg cursor-pointer"
                             onClick={() => window.open(msg.fileUrl, '_blank')}
                         />
-                        {msg.fileName && <div style={{ fontSize: '0.8em', marginTop: '4px' }}>{msg.fileName}</div>}
+                        {msg.fileName && <div className="text-xs mt-1">{msg.fileName}</div>}
                     </div>
                 );
             } else {
                 return (
                     <div>
-                        <div style={{ fontSize: '0.9em', fontWeight: 'bold', marginBottom: '4px' }}>
+                        <div className="text-sm font-bold mb-1">
                             {senderName}
                         </div>
                         <a 
                             href={msg.fileUrl} 
                             target="_blank" 
                             rel="noreferrer"
-                            style={{ 
-                                color: '#007bff', 
-                                textDecoration: 'none',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '5px'
-                            }}
+                            className="text-blue-600 no-underline flex items-center gap-1"
                         >
                             📎 {msg.fileName || 'Download File'}
                         </a>
@@ -250,7 +239,7 @@ const Chat = () => {
         } else if (msg.content) {
             return (
                 <div>
-                    <div style={{ fontSize: '0.9em', fontWeight: 'bold', marginBottom: '4px' }}>
+                    <div className="text-sm font-bold mb-1">
                         {senderName}
                     </div>
                     <div>{msg.content}</div>
@@ -260,10 +249,10 @@ const Chat = () => {
             // Handle case where message has neither content nor file
             return (
                 <div>
-                    <div style={{ fontSize: '0.9em', fontWeight: 'bold', marginBottom: '4px' }}>
+                    <div className="text-sm font-bold mb-1">
                         {senderName}
                     </div>
-                    <em style={{ color: '#999' }}>[Message content unavailable]</em>
+                    <em className="text-gray-500">[Message content unavailable]</em>
                 </div>
             );
         }
@@ -272,97 +261,38 @@ const Chat = () => {
     if (!user || !friendId) return <div>Loading or invalid chat...</div>;
 
     return (
-        <div style={{ 
-            padding: '10px', 
-            border: '1px solid #ccc', 
-            borderRadius: '5px', 
-            maxWidth: '100%', 
-            minHeight: '100vh',
-            boxSizing: 'border-box'
-        }}>
+        <div className="p-2.5 border border-gray-300 rounded-md max-w-full min-h-screen box-border">
             {/* User and Friend Info Header */}
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '15px',
-                padding: '10px',
-                backgroundColor: '#f8f9fa',
-                borderRadius: '8px',
-                flexWrap: 'wrap',
-                gap: '10px'
-            }}>
-                <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    minWidth: '120px'
-                }}>
-                    <div style={{ fontSize: '0.9em', color: '#666', marginBottom: '2px' }}>You</div>
-                    <div style={{ fontWeight: 'bold', fontSize: '1.1em' }}>{user.username}</div>
+            <div className="flex justify-between items-center mb-4 p-2.5 bg-gray-50 rounded-lg flex-wrap gap-2.5">
+                <div className="flex flex-col items-start min-w-[120px]">
+                    <div className="text-sm text-gray-600 mb-0.5">You</div>
+                    <div className="font-bold text-lg">{user.username}</div>
                 </div>
-                <div style={{
-                    fontSize: '1.5em',
-                    color: '#007bff',
-                    display: 'flex',
-                    alignItems: 'center'
-                }}>💬</div>
-                <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-end',
-                    minWidth: '120px'
-                }}>
-                    <div style={{ fontSize: '0.9em', color: '#666', marginBottom: '2px' }}>
+                <div className="text-2xl text-blue-600 flex items-center">💬</div>
+                <div className="flex flex-col items-end min-w-[120px]">
+                    <div className="text-sm text-gray-600 mb-0.5">
                         {isFriendOnline ? '🟢 Online' : '⚪ Offline'}
                     </div>
-                    <div style={{ fontWeight: 'bold', fontSize: '1.1em' }}>{friendInfo?.username || 'Friend'}</div>
+                    <div className="font-bold text-lg">{friendInfo?.username || 'Friend'}</div>
                 </div>
             </div>
             
-            <h2 style={{ 
-                margin: '0 0 15px 0', 
-                fontSize: '1.3em',
-                textAlign: 'center',
-                display: 'none'
-            }}>Chat with {friendInfo?.username || 'Friend'} ({isFriendOnline ? '🟢 Online' : '⚪ Offline'})</h2>
-            <div
-                style={{
-                    height: 'calc(100vh - 250px)',
-                    minHeight: '300px',
-                    maxHeight: '600px',
-                    overflowY: 'auto',
-                    marginBottom: '15px',
-                    border: '1px solid #ddd',
-                    padding: '10px',
-                    background: '#f5f5f5',
-                    borderRadius: '8px'
-                }}
-            >
+            {/* Chat Messages Container */}
+            <div className="h-[calc(100vh-250px)] min-h-[300px] max-h-[600px] overflow-y-auto mb-4 border border-gray-300 p-2.5 bg-gray-100 rounded-lg">
                 {messages.map((msg) => {
                     const isSender = msg.sender._id === user.id || msg.sender === user.id;
                     return (
                         <div
                             key={msg._id}
-                            style={{
-                                textAlign: isSender ? 'right' : 'left',
-                                margin: '10px 0',
-                            }}
+                            className={`my-2.5 ${isSender ? 'text-right' : 'text-left'}`}
                         >
-                            <div
-                                style={{
-                                    display: 'inline-block',
-                                    padding: '8px 12px',
-                                    borderRadius: '12px',
-                                    backgroundColor: isSender ? '#d4f8d4' : '#ffffff',
-                                    maxWidth: '85%',
-                                    wordWrap: 'break-word',
-                                    border: '1px solid #ddd',
-                                    boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                                }}
-                            >
+                            <div className={`inline-block px-3 py-2 rounded-xl max-w-[85%] break-words border shadow-sm ${
+                                isSender 
+                                    ? 'bg-green-100 border-gray-300' 
+                                    : 'bg-white border-gray-300'
+                            }`}>
                                 {renderMessageContent(msg)}
-                                <div style={{ fontSize: '0.7em', color: '#666', marginTop: '4px' }}>
+                                <div className="text-xs text-gray-600 mt-1">
                                     {new Date(msg.timestamp).toLocaleTimeString()}
                                 </div>
                             </div>
@@ -372,29 +302,14 @@ const Chat = () => {
                 <div ref={chatEndRef} />
             </div>
 
-            <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '8px',
-                flexWrap: 'wrap',
-                padding: '10px',
-                backgroundColor: '#fff',
-                borderRadius: '8px',
-                border: '1px solid #ddd'
-            }}>
+            {/* Input Area */}
+            <div className="flex items-center gap-2 flex-wrap p-2.5 bg-white rounded-lg border border-gray-300">
                 <input
                     type="text"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    style={{ 
-                        flex: 1, 
-                        minWidth: '200px',
-                        padding: '12px', 
-                        border: '1px solid #ddd',
-                        borderRadius: '6px',
-                        fontSize: '16px' // Prevents zoom on iOS
-                    }}
+                    className="flex-1 min-w-[200px] px-3 py-3 border border-gray-300 rounded-md text-base disabled:opacity-50"
                     placeholder="Type your message"
                     disabled={isLoading}
                 />
@@ -403,40 +318,24 @@ const Chat = () => {
                     type="file"
                     onChange={handleFileChange}
                     disabled={isLoading}
-                    style={{
-                        fontSize: '14px',
-                        minWidth: '100px'
-                    }}
+                    className="text-sm min-w-[100px] disabled:opacity-50"
                 />
                 <button 
                     onClick={sendMessage} 
                     disabled={isLoading || (!message.trim() && !file)}
-                    style={{ 
-                        padding: '12px 20px',
-                        backgroundColor: isLoading ? '#ccc' : '#007bff',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: isLoading ? 'not-allowed' : 'pointer',
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                        minWidth: '80px',
-                        whiteSpace: 'nowrap'
-                    }}
+                    className={`px-5 py-3 text-white border-none rounded-md text-sm font-bold min-w-[80px] whitespace-nowrap ${
+                        isLoading 
+                            ? 'bg-gray-400 cursor-not-allowed' 
+                            : 'bg-blue-600 hover:bg-blue-700 cursor-pointer'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                     {isLoading ? 'Sending...' : 'Send'}
                 </button>
             </div>
 
+            {/* File Preview */}
             {file && (
-                <div style={{ 
-                    marginTop: '10px', 
-                    padding: '8px 12px', 
-                    background: '#e3f2fd', 
-                    borderRadius: '6px',
-                    border: '1px solid #bbdefb',
-                    fontSize: '14px'
-                }}>
+                <div className="mt-2.5 px-3 py-2 bg-blue-50 rounded-md border border-blue-200 text-sm">
                     📎 Selected file: {file.name}
                 </div>
             )}
