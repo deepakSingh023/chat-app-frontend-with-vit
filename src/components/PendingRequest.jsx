@@ -89,18 +89,18 @@ const PendingRequest = () => {
     return (
         <div className="min-h-screen bg-white text-gray-800">
             {/* Header */}
-            <header className="bg-gradient-to-r from-blue-600 to-green-500 shadow-md text-white px-6 py-4">
-                <h1 className="text-2xl font-bold">Friend Requests</h1>
+            <header className="border shadow-md border-black rounded-md p-6 m-1">
+                <h1 className="text-4xl font-bold">Pending Requests</h1>
             </header>
 
             {/* Content */}
             <main className="max-w-3xl mx-auto p-6">
-                <h2 className="text-xl font-semibold mb-4">Pending Friend Requests</h2>
+                
 
                 {pendingRequests.length > 0 ? (
                     <ul className="space-y-4">
                         {pendingRequests.map((request) => (
-                            <li key={request.userId} className="bg-gray-100 p-4 rounded-lg shadow-sm flex justify-between items-center">
+                            <li key={request.userId} className="bg-gray-100 p-4  border border-black shadow-md rounded-lg flex justify-between items-center">
                                 <span className="font-medium text-lg">{request.username}</span>
                                 <div className="space-x-2">
                                     <button
