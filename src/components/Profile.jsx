@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -13,6 +13,7 @@ const Profile = () => {
   const [profilePic, setProfilePic] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [newProfilePic, setNewProfilePic] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
 
   const token = localStorage.getItem('token');
   const userId = localStorage.getItem('userId');
@@ -42,21 +43,47 @@ const Profile = () => {
     fetchProfile();
   }, [user, token]);
 
-  // Search users
-  const handleSearch = async () => {
-    if (!searchTerm.trim()) return;
+  // Debounced search function
+  const debouncedSearch = useCallback(
+    debounce(async (term) => {
+      if (!term.trim()) {
+        setSearchResults([]);
+        setIsSearching(false);
+        return;
+      }
 
-    try {
-      const response = await axios.get(
-        `https://chat-app-backend-ybof.onrender.com/api/auth/search?name=${searchTerm}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      setSearchResults(response.data);
-    } catch (error) {
-      console.error('Error searching users:', error.message);
-    }
+      setIsSearching(true);
+      try {
+        const response = await axios.get(
+          `https://chat-app-backend-ybof.onrender.com/api/auth/search?name=${term}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        setSearchResults(response.data);
+      } catch (error) {
+        console.error('Error searching users:', error.message);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300),
+    [token]
+  );
+
+  // Debounce utility function
+  function debounce(func, delay) {
+    let timeoutId;
+    return (...args) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => func.apply(null, args), delay);
+    };
+  }
+
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    debouncedSearch(value);
   };
 
   // Send friend request
@@ -110,113 +137,205 @@ const Profile = () => {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen p-4 lg:p-6 bg-gray-100 gap-4 lg:gap-0">
-      {/* Left Side: Profile Info */}
-      <div className="w-full lg:w-1/2 flex flex-col items-center bg-white p-4 lg:p-6 rounded-lg shadow-md space-y-4">
-        <img
-          src={
-              profilePic?.url // if profilePic is an object with { url, public_id }
-              ? profilePic.url
-              : '/default.jpg'
-              }
-          alt="Profile"
-          className="w-24 h-24 sm:w-32 sm:h-32 rounded-full shadow"
-        />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <div className="flex flex-col xl:flex-row max-w-7xl mx-auto p-4 lg:p-8 gap-6 lg:gap-8">
+        {/* Left Side: Profile Info */}
+        <div className="w-full xl:w-2/5 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+          {/* Profile Header with Gradient */}
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 h-32 relative">
+            <div className="absolute inset-0 bg-black opacity-10"></div>
+          </div>
+          
+          <div className="px-6 lg:px-8 pb-8">
+            {/* Profile Picture */}
+            <div className="flex justify-center -mt-16 mb-6">
+              <div className="relative">
+                <img
+                  src={
+                      profilePic?.url
+                      ? profilePic.url
+                      : '/default.jpg'
+                      }
+                  alt="Profile"
+                  className="w-32 h-32 lg:w-40 lg:h-40 rounded-full border-4 border-white shadow-xl object-cover"
+                />
+                <div className="absolute bottom-2 right-2 w-6 h-6 bg-green-500 rounded-full border-2 border-white"></div>
+              </div>
+            </div>
 
-        <h2 className="text-lg sm:text-xl font-bold text-center">{user?.username}</h2>
-        <p className="text-center text-gray-600 text-sm sm:text-base px-2">{description || 'No description'}</p>
+            {/* User Info */}
+            <div className="text-center mb-8">
+              <h1 className="text-2xl lg:text-3xl font-bold text-gray-800 mb-3">{user?.username}</h1>
+              <p className="text-gray-600 text-base lg:text-lg leading-relaxed px-4">
+                {description || 'Welcome to my profile! Add a description to tell others about yourself.'}
+              </p>
+            </div>
 
-        {/* Update Form */}
-        <div className="w-full pt-4 border-t mt-4">
-          <h3 className="text-base sm:text-lg font-semibold mb-2">Update Profile</h3>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => setNewProfilePic(e.target.files[0])}
-            className="mb-2 w-full text-sm"
-          />
-          <textarea
-            value={newDescription}
-            onChange={(e) => setNewDescription(e.target.value)}
-            placeholder="Update your description"
-            className="w-full p-2 border border-gray-300 rounded mb-2 text-sm sm:text-base min-h-[80px]"
-            rows="3"
-          />
-          <button
-            onClick={handleProfileUpdate}
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm sm:text-base"
-          >
-            Update Profile
-          </button>
-        </div>
-      </div>
-
-      {/* Right Side: Search + Navigation */}
-      <div className="w-full lg:w-1/2 flex flex-col lg:pl-8 space-y-4">
-        {/* Search Bar */}
-        <div className="w-full flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search users"
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm sm:text-base"
-          />
-          <button
-            onClick={handleSearch}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm sm:text-base whitespace-nowrap"
-          >
-            Search
-          </button>
-        </div>
-
-        {/* Search Results */}
-        <div className="w-full max-h-64 sm:max-h-80 overflow-y-auto">
-          <ul className="w-full space-y-2">
-            {searchResults.map((result) => (
-              <li
-                key={result._id}
-                className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-white rounded-md shadow space-y-2 sm:space-y-0"
-              >
-                <span
-                  onClick={() => navigate(`/info/${result._id}`)}
-                  className="cursor-pointer hover:text-blue-600 text-sm sm:text-base break-words"
-                >
-                  {result.username}
-                </span>
+            {/* Update Form */}
+            <div className="bg-gray-50 rounded-xl p-6">
+              <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
+                Update Profile
+              </h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Profile Picture</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setNewProfilePic(e.target.files[0])}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                  <textarea
+                    value={newDescription}
+                    onChange={(e) => setNewDescription(e.target.value)}
+                    placeholder="Tell others about yourself..."
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none"
+                    rows="4"
+                  />
+                </div>
+                
                 <button
-                  onClick={() => sendFriendRequest(result._id)}
-                  className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm whitespace-nowrap self-end sm:self-auto"
+                  onClick={handleProfileUpdate}
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transform hover:scale-105 transition-all duration-200 shadow-lg"
                 >
-                  Add Friend
+                  Update Profile
                 </button>
-              </li>
-            ))}
-          </ul>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Navigation Buttons */}
-        <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 pt-4">
-          <button
-            onClick={() => navigate('/FriendList')}
-            className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm sm:text-base"
-          >
-            Friends List
-          </button>
-          <button
-            onClick={() => navigate('/ChatList')}
-            className="px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 text-sm sm:text-base"
-          >
-            Chat List
-          </button>
-          <button
-            onClick={() => navigate('/PendingRequest')}
-            className="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 text-sm sm:text-base col-span-1 sm:col-span-2 lg:col-span-1"
-          >
-            Pending Requests
-          </button>
+        {/* Right Side: Search + Navigation */}
+        <div className="w-full xl:w-3/5 space-y-6">
+          {/* Search Section */}
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 lg:p-8">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+              <span className="w-3 h-3 bg-green-500 rounded-full mr-3"></span>
+              Find Friends
+            </h2>
+            
+            {/* Search Bar */}
+            <div className="relative mb-6">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={handleSearchChange}
+                placeholder="Start typing to search users..."
+                className="w-full px-6 py-4 text-lg border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 pr-12"
+              />
+              <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                {isSearching ? (
+                  <div className="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                ) : (
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                )}
+              </div>
+            </div>
+
+            {/* Search Results */}
+            <div className="max-h-80 overflow-y-auto custom-scrollbar">
+              {searchResults.length > 0 ? (
+                <div className="space-y-3">
+                  {searchResults.map((result) => (
+                    <div
+                      key={result._id}
+                      className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all duration-200 border border-gray-200"
+                    >
+                      <div 
+                        onClick={() => navigate(`/info/${result._id}`)}
+                        className="flex items-center space-x-4 cursor-pointer hover:text-blue-600 transition-colors duration-200 flex-1"
+                      >
+                        <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                          {result.username.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="font-semibold text-gray-800 text-lg">{result.username}</span>
+                      </div>
+                      <button
+                        onClick={() => sendFriendRequest(result._id)}
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105 shadow-md"
+                      >
+                        Add Friend
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : searchTerm && !isSearching ? (
+                <div className="text-center py-8 text-gray-500">
+                  <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <p className="text-lg">No users found</p>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Navigation Section */}
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 lg:p-8">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+              <span className="w-3 h-3 bg-purple-500 rounded-full mr-3"></span>
+              Quick Actions
+            </h2>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4">
+              <button
+                onClick={() => navigate('/FriendList')}
+                className="flex items-center justify-center space-x-3 bg-gradient-to-r from-green-500 to-green-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-green-600 hover:to-green-700 transform hover:scale-105 transition-all duration-200 shadow-lg"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <span>Friends List</span>
+              </button>
+              
+              <button
+                onClick={() => navigate('/ChatList')}
+                className="flex items-center justify-center space-x-3 bg-gradient-to-r from-purple-500 to-purple-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-purple-600 hover:to-purple-700 transform hover:scale-105 transition-all duration-200 shadow-lg"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <span>Chat List</span>
+              </button>
+              
+              <button
+                onClick={() => navigate('/PendingRequest')}
+                className="flex items-center justify-center space-x-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-4 px-6 rounded-xl font-semibold hover:from-yellow-600 hover:to-orange-600 transform hover:scale-105 transition-all duration-200 shadow-lg sm:col-span-2 xl:col-span-1"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Pending Requests</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
+
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #c1c1c1;
+          border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #a8a8a8;
+        }
+      `}</style>
     </div>
   );
 };
