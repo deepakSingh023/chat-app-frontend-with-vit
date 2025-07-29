@@ -150,15 +150,19 @@ const Profile = () => {
             {/* Profile Picture */}
             <div className="flex justify-center -mt-16 mb-6">
               <div className="relative">
-                <img
-                  src={
-                      profilePic?.url
-                      ? profilePic.url
-                      : '/default.jpg'
-                      }
-                  alt="Profile"
-                  className="w-32 h-32 lg:w-40 lg:h-40 rounded-full border-4 border-white shadow-xl object-cover"
-                />
+                {profilePic?.url ? (
+                  <img
+                    src={profilePic.url}
+                    alt="Profile"
+                    className="w-32 h-32 lg:w-40 lg:h-40 rounded-full border-4 border-white shadow-xl object-cover"
+                  />
+                ) : (
+                  <div className="w-32 h-32 lg:w-40 lg:h-40 rounded-full border-4 border-white shadow-xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
+                    <span className="text-white text-3xl lg:text-4xl font-bold">
+                      {user?.username?.charAt(0)?.toUpperCase() || 'U'}
+                    </span>
+                  </div>
+                )}
                 <div className="absolute bottom-2 right-2 w-6 h-6 bg-green-500 rounded-full border-2 border-white"></div>
               </div>
             </div>
