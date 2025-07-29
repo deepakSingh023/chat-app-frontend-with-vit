@@ -147,7 +147,7 @@ const Register = () => {
                             Already have an account?{' '}
                             <button
                                 onClick={() => navigate('/login')}
-                                className="text-green-600 hover:text-green-700 font-semibold transition-colors duration-200"
+                                className="text-white-600 hover:text-green-700 font-semibold transition-colors duration-200"
                             >
                                 Sign in here
                             </button>
